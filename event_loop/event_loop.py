@@ -1,9 +1,11 @@
 import time
 from typing import Callable
+from selectors import SelectorKey
 
 from loguru import logger
 
-from event_loop.queue import Queue, FileObject, SelectorKey
+from event_loop.queue import Queue
+from event_loop.global_stuff import FileObject
 
 
 class EventLoop:
@@ -22,7 +24,6 @@ class EventLoop:
         self._execute(entry_point, *args)
 
         while not self._queue.is_empty():
-            # TODO rename it is not mask and
             callback, mask = self._queue.pop(self._time)
             self._execute(callback, mask)
 
