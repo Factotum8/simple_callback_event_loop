@@ -1,10 +1,9 @@
 import time
-from selectors import SelectorKey
 from typing import Callable
 
 from loguru import logger
 
-from event_loop.queue import Queue, FileObject
+from event_loop.queue import Queue, FileObject, SelectorKey
 
 
 class EventLoop:
@@ -23,17 +22,17 @@ class EventLoop:
         self._execute(entry_point, *args)
 
         while not self._queue.is_empty():
-            # TODO rename it is not mask
+            # TODO rename it is not mask and
             callback, mask = self._queue.pop(self._time)
             self._execute(callback, mask)
 
         self._queue.close()
 
-    def register_descriptor(self, descriptor: FileObject, callback: Callable):
-        self._queue.register_fileobj(descriptor, callback)
+    def register_descriptor(self, descriptor: FileObject, callback: Callable) -> SelectorKey:
+        return self._queue.register_file_obj(descriptor, callback)
 
-    def unregister_descriptor(self, descriptor: FileObject):
-        self._queue.unregister_fileobj(descriptor)
+    def unregister_descriptor(self, descriptor: FileObject) -> SelectorKey:
+        return self._queue.unregister_file_obj(descriptor)
 
     def set_timer(self, duration, callback):
         self._time = now()
@@ -49,6 +48,6 @@ class EventLoop:
 
 def now() -> int:
     """
-    Returns time in microseconds.
+    It returns converting seconds in microseconds.
     """
     return int(time.time() * 10e6)
