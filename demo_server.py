@@ -1,8 +1,6 @@
 import json
-import random
 import sys
 from socketserver import BaseRequestHandler, TCPServer
-from uuid import uuid4
 
 from loguru import logger
 
@@ -13,47 +11,22 @@ class Handler(BaseRequestHandler):
 
     def handle(self):
         client = f'client {self.client_address}'
-        req = self.request.recv(1024)
-        if not req:
+        request = self.request.recv(1024)
+        if not request:
             logger.info(f'{client} unexpectedly disconnected')
             return
 
-        logger.info(f'{client} < {req}')
-        req = req.decode('utf8')
-        if req[-1] != '\n':
-            raise Exception('Max request length exceeded')
+        logger.info(f'{client} < {request}')
+        request = request.decode('utf8')
+        if request[-1] != '\n':
+            raise Exception('Max requestuest length exceeded')
 
-        method, entity_kind, entity_id = req[:-1].split(' ', 3)
-        if (method != 'GET'
-           or entity_kind not in ('user', 'account')
-           or not entity_id.isdigit()):
-            raise Exception('Bad request')
+        self.send(f'Echo serve: {request}'.encode())
+        return
 
-        if entity_kind == 'user':
-            user = self.users.get(entity_id) or {'id': entity_id}
-            self.users[entity_id] = user
-
-            if 'name' not in user:
-                user['name'] = str(uuid4()).split('-')[0]
-
-            if 'account_id' not in user:
-                account_id = str(len(self.accounts) + 1)
-                account = {'id': account_id,
-                           'balance': random.randint(0, 100)}
-                self.accounts[account_id] = account
-                user['account_id'] = account_id
-            self.send(user)
-            return
-
-        if entity_kind == 'account':
-            account = self.accounts[entity_id]
-            self.send(account)
-            return
-
-    def send(self, data):
-        resp = json.dumps(data).encode('utf8')
-        logger.info(f'client {self.client_address} > {resp}')
-        self.request.sendall(resp)
+    def send(self, data: bytes):
+        logger.info(f'client {self.client_address} > {data}')
+        self.request.sendall(data)
 
 
 if __name__ == '__main__':

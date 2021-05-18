@@ -2,18 +2,19 @@
 There are classes, function, variables which are used by other project modules.
 """
 from functools import wraps
-from typing import Any, Callable
-
+from typing import Any, Callable, Union
 
 # FileObject is the file object to monitor.
 # It may either be an integer file descriptor or an object with a fileno() method.
 FileObject = Any
+_Address = [Union[tuple, str], bytes]
 
 
 class ContextMeta(type):
     """
     Provides callmethod properties
     """
+
     def __init__(cls, *args, **kwargs):
         cls._event_loop = None
 

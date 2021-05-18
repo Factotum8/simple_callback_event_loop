@@ -30,6 +30,7 @@ class EventLoop:
 
         self._queue.close()
 
+
     @logger.catch
     def register_descriptor(self, descriptor: FileObject, callback: Callable) -> SelectorKey:
         return self._queue.register_file_obj(descriptor, callback)

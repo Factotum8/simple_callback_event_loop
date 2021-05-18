@@ -4,7 +4,9 @@ import selectors
 from enum import Enum
 from typing import Callable
 
-from event_loop._globals import Context
+from loguru import logger
+
+from event_loop._globals import Context, _Address
 
 
 class SocketState(Enum):
@@ -21,23 +23,26 @@ class CallbackType(Enum):
 
 
 class Socket(Context):
+    status_error_text = 'Not expected socket status'
+
     def __init__(self, *args):
         self._sock = socket.socket(*args)
         self._sock.setblocking(False)
-        self.event_loop.register_descriptor(self._sock, self._on_event)
+        self.event_loop.register_descriptor(self._sock, self._on_event)  # closure
         self._state = SocketState.initial
         self._callbacks = {}
 
-    def connect(self, address, callback: Callable):
-        assert self._state == SocketState.initial
+    @logger.catch
+    def connect(self, address: _Address, callback: Callable):
+        assert self._state == SocketState.initial, self.status_error_text
         self._state = SocketState.connecting
         self._callbacks[CallbackType.connection.value] = callback
         err = self._sock.connect_ex(address)
-        assert errno.errorcode[err] == 'EINPROGRESS'
+        assert errno.errorcode[err] == 'EINPROGRESS', "Operation isn't in progress"
 
-    def recv(self, n, callback):
-        assert self._state == SocketState.connected
-        assert CallbackType.receive.value not in self._callbacks
+    def recv(self, n, callback: Callable):
+        assert self._state == SocketState.connected, self.status_error_text
+        assert CallbackType.receive not in self._callbacks
 
         def _on_read_ready(err):
             if err:
@@ -49,7 +54,7 @@ class Socket(Context):
 
     def sendall(self, data, callback):
         assert self._state == SocketState.connected
-        assert CallbackType.sent.value not in self._callbacks
+        assert CallbackType.sentnot in self._callbacks
 
         def _on_write_ready(err):
             nonlocal data

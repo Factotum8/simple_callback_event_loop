@@ -2,12 +2,12 @@
 There are classes, function, variables which are used by other project modules.
 """
 from functools import wraps
-from typing import Any, Callable
-
+from typing import Any, Callable, Union
 
 # FileObject is the file object to monitor.
 # It may either be an integer file descriptor or an object with a fileno() method.
 FileObject = Any
+_Address = [Union[tuple, str], bytes]
 
 
 class Context:
@@ -28,7 +28,7 @@ class Context:
 class CallLater(Context):
     def __init__(self, duration, callback):
         """
-        Put the init first callback to a event loop
+        Put the init/first callback to a event loop
         """
         self.event_loop.set_timer(duration, callback)
 
