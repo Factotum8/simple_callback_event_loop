@@ -1,32 +1,43 @@
 import errno
 import socket
 import selectors
+from enum import Enum
+from typing import Callable
 
-from event_loop.global_stuff import Context
+from event_loop._globals import Context
+
+
+class SocketState(Enum):
+    initial = 0
+    connecting = 1
+    connected = 2
+    closed = 3
+
+
+class CallbackType(Enum):
+    connection = 'conn'
+    sent = 'sent'
+    receive = 'recv'
 
 
 class Socket(Context):
     def __init__(self, *args):
         self._sock = socket.socket(*args)
         self._sock.setblocking(False)
-        self.event_loop.register_fileobj(self._sock, self._on_event)
-        # 0 - initial
-        # 1 - connecting
-        # 2 - connected
-        # 3 - closed
-        self._state = 0
+        self.event_loop.register_descriptor(self._sock, self._on_event)
+        self._state = SocketState.initial
         self._callbacks = {}
 
-    def connect(self, addr, callback):
-        assert self._state == 0
-        self._state = 1
-        self._callbacks['conn'] = callback
-        err = self._sock.connect_ex(addr)
+    def connect(self, address, callback: Callable):
+        assert self._state == SocketState.initial
+        self._state = SocketState.connecting
+        self._callbacks[CallbackType.connection.value] = callback
+        err = self._sock.connect_ex(address)
         assert errno.errorcode[err] == 'EINPROGRESS'
 
     def recv(self, n, callback):
-        assert self._state == 2
-        assert 'recv' not in self._callbacks
+        assert self._state == SocketState.connected
+        assert CallbackType.receive.value not in self._callbacks
 
         def _on_read_ready(err):
             if err:
@@ -34,11 +45,11 @@ class Socket(Context):
             data = self._sock.recv(n)
             callback(None, data)
 
-        self._callbacks['recv'] = _on_read_ready
+        self._callbacks[CallbackType.receive.value] = _on_read_ready
 
     def sendall(self, data, callback):
-        assert self._state == 2
-        assert 'sent' not in self._callbacks
+        assert self._state == SocketState.connected
+        assert CallbackType.sent.value not in self._callbacks
 
         def _on_write_ready(err):
             nonlocal data
@@ -48,45 +59,45 @@ class Socket(Context):
             n = self._sock.send(data)
             if n < len(data):
                 data = data[n:]
-                self._callbacks['sent'] = _on_write_ready
+                self._callbacks[CallbackType.sent.value] = _on_write_ready
             else:
                 callback(None)
 
-        self._callbacks['sent'] = _on_write_ready
+        self._callbacks[CallbackType.sent.value] = _on_write_ready
 
     def close(self):
-        self.event_loop.unregister_fileobj(self._sock)
+        self.event_loop.unregister_descriptor(self._sock)
         self._callbacks.clear()
-        self._state = 3
+        self._state = SocketState.closed
         self._sock.close()
 
     def _on_event(self, mask):
-        if self._state == 1:
+        if self._state == SocketState.connecting:
             assert mask == selectors.EVENT_WRITE
-            cb = self._callbacks.pop('conn')
+            cb = self._callbacks.pop(CallbackType.connection.value)
             err = self._get_sock_error()
             if err:
                 self.close()
             else:
-                self._state = 2
+                self._state = SocketState.connected
             cb(err)
 
         if mask & selectors.EVENT_READ:
-            cb = self._callbacks.get('recv')
+            cb = self._callbacks.get(CallbackType.receive.value)
             if cb:
-                del self._callbacks['recv']
+                del self._callbacks[CallbackType.receive.value]
                 err = self._get_sock_error()
                 cb(err)
 
         if mask & selectors.EVENT_WRITE:
-            cb = self._callbacks.get('sent')
+            cb = self._callbacks.get(CallbackType.sent.value)
             if cb:
-                del self._callbacks['sent']
+                del self._callbacks[CallbackType.sent.value]
                 err = self._get_sock_error()
                 cb(err)
 
     def _get_sock_error(self):
-        err = self._sock.getsockopt(socket.SOLsocket,
+        err = self._sock.getsockopt(socket.SOL_SOCKET,
                                     socket.SO_ERROR)
         if not err:
             return None

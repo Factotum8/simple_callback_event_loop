@@ -5,7 +5,7 @@ from selectors import SelectorKey
 from loguru import logger
 
 from event_loop.queue import Queue
-from event_loop.global_stuff import FileObject
+from event_loop._globals import FileObject
 
 
 class EventLoop:
@@ -13,6 +13,7 @@ class EventLoop:
         self._queue = queue or Queue()
         self._time = None
 
+    @logger.catch
     def run(self, entry_point: Callable, *args):
         # TODO
         """
@@ -29,9 +30,11 @@ class EventLoop:
 
         self._queue.close()
 
+    @logger.catch
     def register_descriptor(self, descriptor: FileObject, callback: Callable) -> SelectorKey:
         return self._queue.register_file_obj(descriptor, callback)
 
+    @logger.catch
     def unregister_descriptor(self, descriptor: FileObject) -> SelectorKey:
         return self._queue.unregister_file_obj(descriptor)
 

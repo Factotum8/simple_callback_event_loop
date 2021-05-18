@@ -8,10 +8,10 @@ from typing import Callable, Optional
 
 from loguru import logger
 
-from event_loop.global_stuff import FileObject, retry
+from event_loop._globals import FileObject, retry
 
 
-@dataclass
+@dataclass(order=True)
 class Timer:
     timestamp: int  # The timestamp in microseconds since the Epoch.
     timer_number: int  # timer id
@@ -37,7 +37,7 @@ class Queue:
         heapq.heappush(self._timers, Timer(tick, self._timer_number, callback))
         self._timer_number += 1
 
-    @logger.catch
+    # @logger.catch
     @retry((ValueError, KeyError))
     def register_file_obj(self, file_obj: FileObject, callback: Callable) -> SelectorKey:
         """
@@ -48,7 +48,7 @@ class Queue:
                                        selectors.EVENT_READ | selectors.EVENT_WRITE,  # mask
                                        callback)
 
-    @logger.catch
+    # @logger.catch
     @retry((ValueError, KeyError))
     def unregister_file_obj(self, file_obj: FileObject) -> selectors.SelectorKey:
         """
@@ -81,8 +81,9 @@ class Queue:
 
         # If event has expired
         while self._timers and self._timers[0].timestamp <= timestamp:
-            _, _, callback = heapq.heappop(self._timers)
-            self._ready.append((callback, None))
+            # TODO ma be unpack t _, _, callback = heapq.heappop(self._timers)
+            timer = heapq.heappop(self._timers)
+            self._ready.append((timer.callback, None))
 
         return self._ready.popleft()
 
