@@ -54,7 +54,7 @@ class Socket(Context):
 
     def sendall(self, data, callback):
         assert self._state == SocketState.connected
-        assert CallbackType.sentnot in self._callbacks
+        assert CallbackType.sent not in self._callbacks
 
         def _on_write_ready(err):
             nonlocal data
@@ -78,7 +78,7 @@ class Socket(Context):
 
     def _on_event(self, mask):
         if self._state == SocketState.connecting:
-            assert mask == selectors.EVENT_WRITE
+            assert mask == selectors.EVENT_WRITE, self.status_error_text
             cb = self._callbacks.pop(CallbackType.connection.value)
             err = self._get_sock_error()
             if err:

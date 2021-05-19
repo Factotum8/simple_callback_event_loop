@@ -30,7 +30,6 @@ class EventLoop:
 
         self._queue.close()
 
-
     @logger.catch
     def register_descriptor(self, descriptor: FileObject, callback: Callable) -> SelectorKey:
         return self._queue.register_file_obj(descriptor, callback)
@@ -44,10 +43,13 @@ class EventLoop:
         self._queue.register_timer(self._time + duration,
                                    lambda _: callback())
 
-    @logger.catch
     def _execute(self, callback, *args):
         self._time = now()
-        callback(*args)  # new callstack starts
+        try:
+            callback(*args)  # new callstack starts
+        except Exception as e:
+            logger.exception(f'Uncaught exception: \n{e}')
+            # logger.error(f'Uncaught exception: \n{e}')
         self._time = now()
 
 
