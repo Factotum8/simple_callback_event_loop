@@ -1,12 +1,9 @@
-import time
 import heapq
 import selectors
+import collections
 from dataclasses import dataclass
 from selectors import SelectorKey
-import collections
 from typing import Callable, Optional
-
-from loguru import logger
 
 from event_loop._globals import FileObject, retry
 
@@ -16,6 +13,9 @@ class Timer:
     timestamp: int  # The timestamp in microseconds since the Epoch.
     timer_number: int  # timer id
     callback: Callable
+
+    def __iter__(self):
+        return iter((self.timestamp, self.timer_number, self.callback))
 
 
 class Queue:
@@ -37,7 +37,6 @@ class Queue:
         heapq.heappush(self._timers, Timer(tick, self._timer_number, callback))
         self._timer_number += 1
 
-    # @logger.catch
     @retry((ValueError, KeyError))
     def register_file_obj(self, file_obj: FileObject, callback: Callable) -> SelectorKey:
         """
@@ -48,7 +47,6 @@ class Queue:
                                        selectors.EVENT_READ | selectors.EVENT_WRITE,  # mask
                                        callback)
 
-    # @logger.catch
     @retry((ValueError, KeyError))
     def unregister_file_obj(self, file_obj: FileObject) -> selectors.SelectorKey:
         """
@@ -59,6 +57,10 @@ class Queue:
         return self._selector.unregister(file_obj)
 
     def pop(self, timestamp: Optional[int]) -> tuple[Callable, Optional[bytes]]:
+        """
+        Return a ready callback
+        It may throw the IndexError if _ready is empty.
+        """
         if self._ready:
             return self._ready.popleft()
 
@@ -72,16 +74,8 @@ class Queue:
             callback = key.data
             self._ready.append((callback, mask))
 
-        # waiting event
-        if not self._ready and self._timers:
-            idle = (self._timers[0].timestamp - timestamp)
-            if idle > 0:
-                time.sleep(self.microseconds2seconds(idle))
-                return self.pop(timestamp + idle)
-
         # If event has expired
         while self._timers and self._timers[0].timestamp <= timestamp:
-            # TODO ma be unpack t _, _, callback = heapq.heappop(self._timers)
             timer = heapq.heappop(self._timers)
             self._ready.append((timer.callback, None))
 

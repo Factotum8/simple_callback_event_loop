@@ -27,7 +27,7 @@ def main(*_):
 
                 logger.info(resp)
 
-            raise Exception('Do not throw from callbacks')
+            # raise Exception('Do not throw from callbacks')
 
             sock.recv(1024, on_resp)
 
